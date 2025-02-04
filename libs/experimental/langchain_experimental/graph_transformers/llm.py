@@ -269,8 +269,8 @@ def create_unstructured_prompt(
     node_labels: Optional[List[str]] = None,
     rel_types: Optional[Union[List[str], List[Tuple[str, str, str]]]] = None,
     relationship_type: Optional[str] = None,
-    property_types: Optional[List[str]] = None,
-    rels_property_types: Optional[List[str]] = None,
+    property_types: Optional[Union[bool, List[str]]] = None,
+    rels_property_types: Optional[Union[bool, List[str]]] = None,
     additional_instructions: Optional[str] = "",
 ) -> ChatPromptTemplate:
     node_labels_str = str(node_labels) if node_labels else ""
@@ -913,7 +913,7 @@ class LLMGraphTransformer:
             prompt = prompt or get_default_prompt(additional_instructions)
             self.chain = prompt | structured_llm
 
-    def _parse_raw_schema(self, raw_schema):
+    def _parse_raw_schema(self, raw_schema: Union[str, Any]) -> Any:
         """Parse raw schema into JSON format and ensure it's a list."""
         if not isinstance(raw_schema, str):
             raw_schema = raw_schema.content
@@ -922,7 +922,7 @@ class LLMGraphTransformer:
             parsed_json = [parsed_json]
         return parsed_json
 
-    def _parse_relations(self, parsed_json):
+    def _parse_relations(self, parsed_json: List[Dict[str, Any]]) -> Tuple[List[Node], List[Relationship]]:
         """Parse relationships from JSON, with optional type checking."""
         nodes_set = {}
         relationships = []
@@ -969,7 +969,9 @@ class LLMGraphTransformer:
         ]
         return (nodes, relationships)
 
-    def _apply_strict_mode_filtering(self, nodes, relationships):
+    def _apply_strict_mode_filtering(
+        self, nodes: List[Node], relationships: List[Relationship]
+    ) -> Tuple[List[Node], List[Relationship]]:
         """Apply strict mode filtering to nodes and relationships."""
         if self.strict_mode and (self.allowed_nodes or self.allowed_relationships):
             if self.allowed_nodes:
@@ -1006,7 +1008,9 @@ class LLMGraphTransformer:
                         rel
                         for rel in relationships
                         if rel.type.lower()
-                        in [el.lower() for el in self.allowed_relationships]
+                        in [el.lower() if isinstance(el, str) else tuple(item.lower() for item in el)
+                            for el in self.allowed_relationships
+                        ]
                     ]
         return nodes, relationships
 
