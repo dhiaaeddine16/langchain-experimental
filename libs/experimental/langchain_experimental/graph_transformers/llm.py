@@ -300,12 +300,12 @@ def create_unstructured_prompt(
         else "",
         'The "relation" key must indicate the type of relationship between the head '
         'and tail. For attribute relationships, use "HAS_PROPERTY", and for '
-        'entity-to-entity relationships, choose one of the types '
+        "entity-to-entity relationships, choose one of the types "
         f'from {rel_types_str}.'
         if rel_types
         else "",
         'The "tail" key must represent either the text of an extracted entity in a '
-        'relationship or the value of a property. '
+        "relationship or the value of a property. "
         if node_labels or property_types
         else "",
         'For entity relationships, the "tail_type" must be one of the entity types '
@@ -317,7 +317,7 @@ def create_unstructured_prompt(
         if property_types
         else "",
         'The "relation_properties" key must contain any additional properties '
-        'associated with the relationship itself. Allowed relationship '
+        "associated with the relationship itself. Allowed relationship "
         f'properties include: {rels_property_types_str}.'
         if rels_property_types
         else "",
