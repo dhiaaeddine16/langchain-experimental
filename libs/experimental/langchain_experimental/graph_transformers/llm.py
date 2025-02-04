@@ -922,7 +922,9 @@ class LLMGraphTransformer:
             parsed_json = [parsed_json]
         return parsed_json
 
-    def _parse_relations(self, parsed_json: List[Dict[str, Any]]) -> Tuple[List[Node], List[Relationship]]:
+    def _parse_relations(
+            self, parsed_json: List[Dict[str, Any]]
+    ) -> Tuple[List[Node], List[Relationship]]:
         """Parse relationships from JSON, with optional type checking."""
         nodes_set = {}
         relationships = []
@@ -1008,7 +1010,10 @@ class LLMGraphTransformer:
                         rel
                         for rel in relationships
                         if rel.type.lower()
-                        in [el.lower() if isinstance(el, str) else tuple(item.lower() for item in el)
+                        in [
+                                el.lower() 
+                                if isinstance(el, str) 
+                                else tuple(item.lower() for item in el)
                             for el in self.allowed_relationships
                         ]
                     ]
