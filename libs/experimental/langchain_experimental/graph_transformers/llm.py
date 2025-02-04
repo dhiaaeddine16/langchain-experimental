@@ -25,7 +25,7 @@ examples = [
         "relation": "HAS_PROPERTY",
         "tail": "35",
         "tail_type": "age",
-        "relation_properties": {}
+        "relation_properties": {},
     },
     {
         "text": "Adam (age 35) works at Microsoft since 2009",
@@ -34,7 +34,7 @@ examples = [
         "relation": "WORKS_FOR",
         "tail": "Microsoft",
         "tail_type": "Company",
-        "relation_properties": {"since_date": 2009}
+        "relation_properties": {"since_date": 2009},
     },
     {
         "text": "Microsoft Word v5.1 released in 2023",
@@ -43,7 +43,7 @@ examples = [
         "relation": "HAS_PROPERTY",
         "tail": "v5.1",
         "tail_type": "version",
-        "relation_properties": {}
+        "relation_properties": {},
     },
     {
         "text": "Microsoft Word v5.1 released in 2023",
@@ -52,7 +52,7 @@ examples = [
         "relation": "HAS_PROPERTY",
         "tail": "2023",
         "tail_type": "released_date",
-        "relation_properties": {}
+        "relation_properties": {},
     },
     {
         "text": "Sarah (age 29) is a software engineer at Google",
@@ -61,7 +61,7 @@ examples = [
         "relation": "HAS_PROPERTY",
         "tail": "29",
         "tail_type": "age",
-        "relation_properties": {}
+        "relation_properties": {},
     },
     {
         "text": "Sarah (age 29) is a software engineer at Google",
@@ -70,7 +70,7 @@ examples = [
         "relation": "WORKS_FOR",
         "tail": "Google",
         "tail_type": "Organization",
-        "relation_properties": {"role":"software engineer"}
+        "relation_properties": {"role": "software engineer"},
     },
     {
         "text": "Tesla Model S launched in 2012",
@@ -79,7 +79,7 @@ examples = [
         "relation": "HAS_PROPERTY",
         "tail": "2012",
         "tail_type": "launch_date",
-        "relation_properties": {}
+        "relation_properties": {},
     },
     {
         "text": "Microsoft was founded in 1975 by Bill Gates",
@@ -88,7 +88,7 @@ examples = [
         "relation": "FOUNDED_BY",
         "tail": "Bill Gates",
         "tail_type": "Person",
-        "relation_properties": {"founding_date": "1975"}
+        "relation_properties": {"founding_date": "1975"},
     },
     {
         "text": "Amazon was founded by Jeff Bezos in 1994",
@@ -97,7 +97,7 @@ examples = [
         "relation": "FOUNDED_BY",
         "tail": "Jeff Bezos",
         "tail_type": "Person",
-        "relation_properties": {"founding_date": "1994"}
+        "relation_properties": {"founding_date": "1994"},
     },
     {
         "text": "Mark Zuckerberg is the CEO of Meta",
@@ -106,8 +106,8 @@ examples = [
         "relation": "WORKS_FOR",
         "tail": "Meta",
         "tail_type": "Organization",
-        "relation_properties": {"role": "CEO"}
-    }
+        "relation_properties": {"role": "CEO"},
+    },
 ]
 
 system_prompt = (
@@ -301,7 +301,7 @@ def create_unstructured_prompt(
         'The "relation" key must indicate the type of relationship between the head '
         'and tail. For attribute relationships, use "HAS_PROPERTY", and for '
         "entity-to-entity relationships, choose one of the types "
-        f'from {rel_types_str}.'
+        f"from {rel_types_str}."
         if rel_types
         else "",
         'The "tail" key must represent either the text of an extracted entity in a '
@@ -309,7 +309,7 @@ def create_unstructured_prompt(
         if node_labels or property_types
         else "",
         'For entity relationships, the "tail_type" must be one of the entity types '
-        f'from {node_labels_str}. '  
+        f"from {node_labels_str}. "
         if node_labels
         else "",
         'For properties/attributes, the relation must be "HAS_PROPERTY", and the '
@@ -318,7 +318,7 @@ def create_unstructured_prompt(
         else "",
         'The "relation_properties" key must contain any additional properties '
         "associated with the relationship itself. Allowed relationship "
-        f'properties include: {rels_property_types_str}.'
+        f"properties include: {rels_property_types_str}."
         if rels_property_types
         else "",
         "Your task is to extract relationships from text strictly adhering "
@@ -363,12 +363,15 @@ def create_unstructured_prompt(
         "Use the following property types for entity attributes, don't use "
         "other properties that is not defined below:"
         "# PROPERTY TYPES:"
-        "{property_types}" 
-        if property_types else "",
+        "{property_types}"
+        if property_types
+        else "",
         "Use the following relation property types, don't use other relation "
         "property types that is not defined below:"
         "# RELATION PROPERTY TYPES:"
-        "{rels_property_types}" if rels_property_types else "",
+        "{rels_property_types}"
+        if rels_property_types
+        else "",
         "Your task is to extract relationships from text strictly adhering "
         "to the provided schema. The relationships can only appear "
         "between specific node types are presented in the schema format "
@@ -476,8 +479,7 @@ def create_simple_model(
             value: str = Field(
                 ...,
                 description=(
-                    "Extracted value. Any date value "
-                    "should be formatted as yyyy-mm-dd."
+                    "Extracted value. Any date value should be formatted as yyyy-mm-dd."
                 ),
             )
 
@@ -556,8 +558,7 @@ def create_simple_model(
             value: str = Field(
                 ...,
                 description=(
-                    "Extracted value. Any date value "
-                    "should be formatted as yyyy-mm-dd."
+                    "Extracted value. Any date value should be formatted as yyyy-mm-dd."
                 ),
             )
 
@@ -911,7 +912,7 @@ class LLMGraphTransformer:
             structured_llm = llm.with_structured_output(schema, include_raw=True)
             prompt = prompt or get_default_prompt(additional_instructions)
             self.chain = prompt | structured_llm
-    
+
     def _parse_raw_schema(self, raw_schema):
         """Parse raw schema into JSON format and ensure it's a list."""
         if not isinstance(raw_schema, str):
@@ -951,29 +952,22 @@ class LLMGraphTransformer:
                 # Ensure the tail node is registered
                 if tail not in nodes_set:
                     nodes_set[tail] = {"type": tail_type, "properties": {}}
-                
+
                 # Store the relationship
                 relationships.append(
                     Relationship(
                         source=Node(id=head, type=head_type),
                         target=Node(id=tail, type=tail_type),
                         type=relation_type,
-                        properties=rel.get("relation_properties", {})
+                        properties=rel.get("relation_properties", {}),
                     )
                 )
         # Convert nodes_set to a list of Node objects with properties
         nodes = [
-            Node(
-                id=node_id,
-                type=data["type"],
-                properties=data["properties"]
-            )
+            Node(id=node_id, type=data["type"], properties=data["properties"])
             for node_id, data in nodes_set.items()
         ]
-        return (
-            nodes,
-            relationships
-        )
+        return (nodes, relationships)
 
     def _apply_strict_mode_filtering(self, nodes, relationships):
         """Apply strict mode filtering to nodes and relationships."""
@@ -1015,7 +1009,7 @@ class LLMGraphTransformer:
                         in [el.lower() for el in self.allowed_relationships]
                     ]
         return nodes, relationships
-    
+
     def process_response(
         self, document: Document, config: Optional[RunnableConfig] = None
     ) -> GraphDocument:
@@ -1031,13 +1025,9 @@ class LLMGraphTransformer:
         else:
             parsed_json = self._parse_raw_schema(raw_schema)
             nodes, relationships = self._parse_relations(parsed_json)
-        
+
         nodes, relationships = self._apply_strict_mode_filtering(nodes, relationships)
-        return GraphDocument(
-            nodes=nodes,
-            relationships=relationships,
-            source=document
-        )
+        return GraphDocument(nodes=nodes, relationships=relationships, source=document)
 
     def convert_to_graph_documents(
         self, documents: Sequence[Document], config: Optional[RunnableConfig] = None
@@ -1068,13 +1058,9 @@ class LLMGraphTransformer:
         else:
             parsed_json = self._parse_raw_schema(raw_schema)
             nodes, relationships = self._parse_relations(parsed_json)
-        
+
         nodes, relationships = self._apply_strict_mode_filtering(nodes, relationships)
-        return GraphDocument(
-            nodes=nodes,
-            relationships=relationships,
-            source=document
-        )
+        return GraphDocument(nodes=nodes, relationships=relationships, source=document)
 
     async def aconvert_to_graph_documents(
         self, documents: Sequence[Document], config: Optional[RunnableConfig] = None
