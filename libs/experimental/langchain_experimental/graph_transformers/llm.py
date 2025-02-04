@@ -19,54 +19,95 @@ DEFAULT_NODE_TYPE = "Node"
 
 examples = [
     {
-        "text": (
-            "Adam is a software engineer in Microsoft since 2009, "
-            "and last year he got an award as the Best Talent"
-        ),
+        "text": "Adam (age 35) works at Microsoft since 2009",
+        "head": "Adam",
+        "head_type": "Person",
+        "relation": "HAS_PROPERTY",
+        "tail": "35",
+        "tail_type": "age",
+        "relation_properties": {}
+    },
+    {
+        "text": "Adam (age 35) works at Microsoft since 2009",
         "head": "Adam",
         "head_type": "Person",
         "relation": "WORKS_FOR",
         "tail": "Microsoft",
         "tail_type": "Company",
+        "relation_properties": {"since_date": 2009}
     },
     {
-        "text": (
-            "Adam is a software engineer in Microsoft since 2009, "
-            "and last year he got an award as the Best Talent"
-        ),
-        "head": "Adam",
+        "text": "Microsoft Word v5.1 released in 2023",
+        "head": "Microsoft Word",
+        "head_type": "Product",
+        "relation": "HAS_PROPERTY",
+        "tail": "v5.1",
+        "tail_type": "version",
+        "relation_properties": {}
+    },
+    {
+        "text": "Microsoft Word v5.1 released in 2023",
+        "head": "Microsoft Word",
+        "head_type": "Product",
+        "relation": "HAS_PROPERTY",
+        "tail": "2023",
+        "tail_type": "released_date",
+        "relation_properties": {}
+    },
+    {
+        "text": "Sarah (age 29) is a software engineer at Google",
+        "head": "Sarah",
         "head_type": "Person",
-        "relation": "HAS_AWARD",
-        "tail": "Best Talent",
-        "tail_type": "Award",
+        "relation": "HAS_PROPERTY",
+        "tail": "29",
+        "tail_type": "age",
+        "relation_properties": {}
     },
     {
-        "text": (
-            "Microsoft is a tech company that provide "
-            "several products such as Microsoft Word"
-        ),
-        "head": "Microsoft Word",
-        "head_type": "Product",
-        "relation": "PRODUCED_BY",
-        "tail": "Microsoft",
-        "tail_type": "Company",
+        "text": "Sarah (age 29) is a software engineer at Google",
+        "head": "Sarah",
+        "head_type": "Person",
+        "relation": "WORKS_FOR",
+        "tail": "Google",
+        "tail_type": "Organization",
+        "relation_properties": {"role":"software engineer"}
     },
     {
-        "text": "Microsoft Word is a lightweight app that accessible offline",
-        "head": "Microsoft Word",
+        "text": "Tesla Model S launched in 2012",
+        "head": "Tesla Model S",
         "head_type": "Product",
-        "relation": "HAS_CHARACTERISTIC",
-        "tail": "lightweight app",
-        "tail_type": "Characteristic",
+        "relation": "HAS_PROPERTY",
+        "tail": "2012",
+        "tail_type": "launch_date",
+        "relation_properties": {}
     },
     {
-        "text": "Microsoft Word is a lightweight app that accessible offline",
-        "head": "Microsoft Word",
-        "head_type": "Product",
-        "relation": "HAS_CHARACTERISTIC",
-        "tail": "accessible offline",
-        "tail_type": "Characteristic",
+        "text": "Microsoft was founded in 1975 by Bill Gates",
+        "head": "Microsoft",
+        "head_type": "Company",
+        "relation": "FOUNDED_BY",
+        "tail": "Bill Gates",
+        "tail_type": "Person",
+        "relation_properties": {"founding_date": "1975"}
     },
+    {
+        "text": "Amazon was founded by Jeff Bezos in 1994",
+        "head": "Amazon",
+        "head_type": "Company",
+        "relation": "FOUNDED_BY",
+        "tail": "Jeff Bezos",
+        "tail_type": "Person",
+        "relation_properties": {"founding_date": "1994"}
+    },
+    {
+        "text": "Mark Zuckerberg is the CEO of Meta",
+        "head": "Mark Zuckerberg",
+        "head_type": "Person",
+        "relation": "WORKS_FOR",
+        "tail": "Meta",
+        "tail_type": "Organization",
+        "relation_properties": {"role": "CEO"}
+    }
 ]
 
 system_prompt = (
@@ -197,15 +238,30 @@ class UnstructuredRelation(BaseModel):
     head_type: str = Field(
         description="type of the extracted head entity like Person, Company, etc"
     )
-    relation: str = Field(description="relation between the head and the tail entities")
+    relation: str = Field(
+        description=(
+            "Specific relationship name the head and the tail. "
+            "Use 'HAS_PROPERTY' for property relationships"
+        )
+    )
     tail: str = Field(
         description=(
-            "extracted tail entity like Microsoft, Apple, John. "
-            "Must use human-readable unique identifier."
+            "extracted tail property value or entity identifier. "
+            "For properties: the property value. "
+            "For relations: entity like Microsoft, Apple, John, "
+            "Must use human-readable unique identifier. "
         )
     )
     tail_type: str = Field(
-        description="type of the extracted tail entity like Person, Company, etc"
+        description=(
+            "For properties: type of the property being recorded. "
+            "For relations: type of the extracted tail entity "
+            "like Person, Company, etc. "
+        )
+    )
+    relation_properties: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Properties of the relationship itself",
     )
 
 
@@ -213,6 +269,8 @@ def create_unstructured_prompt(
     node_labels: Optional[List[str]] = None,
     rel_types: Optional[Union[List[str], List[Tuple[str, str, str]]]] = None,
     relationship_type: Optional[str] = None,
+    property_types: Optional[List[str]] = None,
+    rels_property_types: Optional[List[str]] = None,
     additional_instructions: Optional[str] = "",
 ) -> ChatPromptTemplate:
     node_labels_str = str(node_labels) if node_labels else ""
@@ -223,36 +281,55 @@ def create_unstructured_prompt(
             rel_types_str = str(rel_types)
     else:
         rel_types_str = ""
+    property_types_str = str(property_types) if property_types else ""
+    rels_property_types_str = str(rels_property_types) if rels_property_types else ""
     base_string_parts = [
         "You are a top-tier algorithm designed for extracting information in "
-        "structured formats to build a knowledge graph. Your task is to identify "
-        "the entities and relations requested with the user prompt from a given "
-        "text. You must generate the output in a JSON format containing a list "
+        "structured formats to build a knowledge graph. "
+        "Your task is to identify the entities, their properties, the relationships "
+        "between entities, and the properties associated with those relationships "
+        "requested with the user prompt from a given text. "
+        "You must generate the output in a JSON format containing a list "
         'with JSON objects. Each object should have the keys: "head", '
-        '"head_type", "relation", "tail", and "tail_type". The "head" '
-        "key must contain the text of the extracted entity with one of the types "
-        "from the provided list in the user prompt.",
-        f'The "head_type" key must contain the type of the extracted head entity, '
+        '"head_type", "relation", "tail", "tail_type", and "relation_properties". '
+        'The "head" key must contain the text of the extracted entity with one of '
+        "the types from the provided list in the user prompt.",
+        'The "head_type" key must contain the type of the extracted head entity, '
         f"which must be one of the types from {node_labels_str}."
         if node_labels
         else "",
-        f'The "relation" key must contain the type of relation between the "head" '
-        f'and the "tail", which must be one of the relations from {rel_types_str}.'
+        'The "relation" key must indicate the type of relationship between the head '
+        'and tail. For attribute relationships, use "HAS_PROPERTY", and for '
+        'entity-to-entity relationships, choose one of the types '
+        f'from {rel_types_str}.'
         if rel_types
         else "",
-        f'The "tail" key must represent the text of an extracted entity which is '
-        f'the tail of the relation, and the "tail_type" key must contain the type '
-        f"of the tail entity from {node_labels_str}."
+        'The "tail" key must represent either the text of an extracted entity in a '
+        'relationship or the value of a property. '
+        if node_labels or property_types
+        else "",
+        'For entity relationships, the "tail_type" must be one of the entity types '
+        f'from {node_labels_str}. '  
         if node_labels
+        else "",
+        'For properties/attributes, the relation must be "HAS_PROPERTY", and the '
+        f'"tail_type" must be one of {property_types_str}.'
+        if property_types
+        else "",
+        'The "relation_properties" key must contain any additional properties '
+        'associated with the relationship itself. Allowed relationship '
+        f'properties include: {rels_property_types_str}.'
+        if rels_property_types
         else "",
         "Your task is to extract relationships from text strictly adhering "
         "to the provided schema. The relationships can only appear "
         "between specific node types are presented in the schema format "
-        "like: (Entity1Type, RELATIONSHIP_TYPE, Entity2Type) /n"
-        f"Provided schema is {rel_types}"
+        "like: (Entity1Type, RELATIONSHIP_TYPE, Entity2Type) \n"
+        f"Provided schema is:{rel_types}"
         if relationship_type == "tuple"
         else "",
-        "Attempt to extract as many entities and relations as you can. Maintain "
+        "Attempt to extract as many entities, relations, entities properties, "
+        "and relation properties as you can. Maintain "
         "Entity Consistency: When extracting entities, it's vital to ensure "
         'consistency. If an entity, such as "John Doe", is mentioned multiple '
         "times in the text but is referred to by different names or pronouns "
@@ -269,8 +346,8 @@ def create_unstructured_prompt(
     parser = JsonOutputParser(pydantic_object=UnstructuredRelation)
 
     human_string_parts = [
-        "Based on the following example, extract entities and "
-        "relations from the provided text.\n\n",
+        "Based on the following example, extract entities, relationships, "
+        "entity properties, and relation properties from the provided text.",
         "Use the following entity types, don't use other entity "
         "that is not defined below:"
         "# ENTITY TYPES:"
@@ -283,6 +360,15 @@ def create_unstructured_prompt(
         "{rel_types}"
         if rel_types
         else "",
+        "Use the following property types for entity attributes, don't use "
+        "other properties that is not defined below:"
+        "# PROPERTY TYPES:"
+        "{property_types}" 
+        if property_types else "",
+        "Use the following relation property types, don't use other relation "
+        "property types that is not defined below:"
+        "# RELATION PROPERTY TYPES:"
+        "{rels_property_types}" if rels_property_types else "",
         "Your task is to extract relationships from text strictly adhering "
         "to the provided schema. The relationships can only appear "
         "between specific node types are presented in the schema format "
@@ -306,6 +392,8 @@ def create_unstructured_prompt(
             "format_instructions": parser.get_format_instructions(),
             "node_labels": node_labels,
             "rel_types": rel_types,
+            "property_types": property_types,
+            "rels_property_types": rels_property_types,
             "examples": examples,
         },
     )
@@ -788,12 +876,6 @@ class LLMGraphTransformer:
             except NotImplementedError:
                 self._function_call = False
         if not self._function_call:
-            if node_properties or relationship_properties:
-                raise ValueError(
-                    "The 'node_properties' and 'relationship_properties' parameters "
-                    "cannot be used in combination with a LLM that doesn't support "
-                    "native function calling."
-                )
             try:
                 import json_repair  # type: ignore
 
@@ -807,6 +889,8 @@ class LLMGraphTransformer:
                 allowed_nodes,
                 allowed_relationships,
                 self._relationship_type,
+                node_properties,
+                relationship_properties,
                 additional_instructions,
             )
             self.chain = prompt | llm
@@ -827,56 +911,72 @@ class LLMGraphTransformer:
             structured_llm = llm.with_structured_output(schema, include_raw=True)
             prompt = prompt or get_default_prompt(additional_instructions)
             self.chain = prompt | structured_llm
+    
+    def _parse_raw_schema(self, raw_schema):
+        """Parse raw schema into JSON format and ensure it's a list."""
+        if not isinstance(raw_schema, str):
+            raw_schema = raw_schema.content
+        parsed_json = self.json_repair.loads(raw_schema)
+        if isinstance(parsed_json, dict):
+            parsed_json = [parsed_json]
+        return parsed_json
 
-    def process_response(
-        self, document: Document, config: Optional[RunnableConfig] = None
-    ) -> GraphDocument:
-        """
-        Processes a single document, transforming it into a graph document using
-        an LLM based on the model's schema and constraints.
-        """
-        text = document.page_content
-        raw_schema = self.chain.invoke({"input": text}, config=config)
-        if self._function_call:
-            raw_schema = cast(Dict[Any, Any], raw_schema)
-            nodes, relationships = _convert_to_graph_document(raw_schema)
-        else:
-            nodes_set = set()
-            relationships = []
-            if not isinstance(raw_schema, str):
-                raw_schema = raw_schema.content
-            parsed_json = self.json_repair.loads(raw_schema)
-            if isinstance(parsed_json, dict):
-                parsed_json = [parsed_json]
-            for rel in parsed_json:
-                # Check if mandatory properties are there
-                if (
-                    not isinstance(rel, dict)
-                    or not rel.get("head")
-                    or not rel.get("tail")
-                    or not rel.get("relation")
-                ):
-                    continue
-                # Nodes need to be deduplicated using a set
-                # Use default Node label for nodes if missing
-                nodes_set.add((rel["head"], rel.get("head_type", DEFAULT_NODE_TYPE)))
-                nodes_set.add((rel["tail"], rel.get("tail_type", DEFAULT_NODE_TYPE)))
-
-                source_node = Node(
-                    id=rel["head"], type=rel.get("head_type", DEFAULT_NODE_TYPE)
-                )
-                target_node = Node(
-                    id=rel["tail"], type=rel.get("tail_type", DEFAULT_NODE_TYPE)
-                )
+    def _parse_relations(self, parsed_json):
+        """Parse relationships from JSON, with optional type checking."""
+        nodes_set = {}
+        relationships = []
+        for rel in parsed_json:
+            # Check if mandatory properties are there
+            if (
+                not isinstance(rel, dict)
+                or not rel.get("head")
+                or not rel.get("tail")
+                or not rel.get("relation")
+            ):
+                continue
+            # Nodes need to be deduplicated using a set
+            # Use default Node label for nodes if missing
+            head = rel["head"]
+            head_type = rel.get("head_type", DEFAULT_NODE_TYPE)
+            tail = rel["tail"]
+            tail_type = rel.get("tail_type", DEFAULT_NODE_TYPE)
+            relation_type = rel["relation"]
+            # Ensure the node exists in the dictionary
+            if head not in nodes_set:
+                nodes_set[head] = {"type": head_type, "properties": {}}
+            # Handle "HAS_PROPERTY" differently
+            if relation_type == "HAS_PROPERTY":
+                nodes_set[head]["properties"][tail_type] = tail
+            else:
+                # Ensure the tail node is registered
+                if tail not in nodes_set:
+                    nodes_set[tail] = {"type": tail_type, "properties": {}}
+                
+                # Store the relationship
                 relationships.append(
                     Relationship(
-                        source=source_node, target=target_node, type=rel["relation"]
+                        source=Node(id=head, type=head_type),
+                        target=Node(id=tail, type=tail_type),
+                        type=relation_type,
+                        properties=rel.get("relation_properties", {})
                     )
                 )
-            # Create nodes list
-            nodes = [Node(id=el[0], type=el[1]) for el in list(nodes_set)]
+        # Convert nodes_set to a list of Node objects with properties
+        nodes = [
+            Node(
+                id=node_id,
+                type=data["type"],
+                properties=data["properties"]
+            )
+            for node_id, data in nodes_set.items()
+        ]
+        return (
+            nodes,
+            relationships
+        )
 
-        # Strict mode filtering
+    def _apply_strict_mode_filtering(self, nodes, relationships):
+        """Apply strict mode filtering to nodes and relationships."""
         if self.strict_mode and (self.allowed_nodes or self.allowed_relationships):
             if self.allowed_nodes:
                 lower_allowed_nodes = [el.lower() for el in self.allowed_nodes]
@@ -912,10 +1012,32 @@ class LLMGraphTransformer:
                         rel
                         for rel in relationships
                         if rel.type.lower()
-                        in [el.lower() for el in self.allowed_relationships]  # type: ignore
+                        in [el.lower() for el in self.allowed_relationships]
                     ]
-
-        return GraphDocument(nodes=nodes, relationships=relationships, source=document)
+        return nodes, relationships
+    
+    def process_response(
+        self, document: Document, config: Optional[RunnableConfig] = None
+    ) -> GraphDocument:
+        """
+        Processes a single document, transforming it into a graph document using
+        an LLM based on the model's schema and constraints.
+        """
+        text = document.page_content
+        raw_schema = self.chain.invoke({"input": text}, config=config)
+        if self._function_call:
+            raw_schema = cast(Dict[Any, Any], raw_schema)
+            nodes, relationships = _convert_to_graph_document(raw_schema)
+        else:
+            parsed_json = self._parse_raw_schema(raw_schema)
+            nodes, relationships = self._parse_relations(parsed_json)
+        
+        nodes, relationships = self._apply_strict_mode_filtering(nodes, relationships)
+        return GraphDocument(
+            nodes=nodes,
+            relationships=relationships,
+            source=document
+        )
 
     def convert_to_graph_documents(
         self, documents: Sequence[Document], config: Optional[RunnableConfig] = None
@@ -944,79 +1066,15 @@ class LLMGraphTransformer:
             raw_schema = cast(Dict[Any, Any], raw_schema)
             nodes, relationships = _convert_to_graph_document(raw_schema)
         else:
-            nodes_set = set()
-            relationships = []
-            if not isinstance(raw_schema, str):
-                raw_schema = raw_schema.content
-            parsed_json = self.json_repair.loads(raw_schema)
-            if isinstance(parsed_json, dict):
-                parsed_json = [parsed_json]
-            for rel in parsed_json:
-                # Check if mandatory properties are there
-                if (
-                    not rel.get("head")
-                    or not rel.get("tail")
-                    or not rel.get("relation")
-                ):
-                    continue
-                # Nodes need to be deduplicated using a set
-                # Use default Node label for nodes if missing
-                nodes_set.add((rel["head"], rel.get("head_type", DEFAULT_NODE_TYPE)))
-                nodes_set.add((rel["tail"], rel.get("tail_type", DEFAULT_NODE_TYPE)))
-
-                source_node = Node(
-                    id=rel["head"], type=rel.get("head_type", DEFAULT_NODE_TYPE)
-                )
-                target_node = Node(
-                    id=rel["tail"], type=rel.get("tail_type", DEFAULT_NODE_TYPE)
-                )
-                relationships.append(
-                    Relationship(
-                        source=source_node, target=target_node, type=rel["relation"]
-                    )
-                )
-            # Create nodes list
-            nodes = [Node(id=el[0], type=el[1]) for el in list(nodes_set)]
-
-        if self.strict_mode and (self.allowed_nodes or self.allowed_relationships):
-            if self.allowed_nodes:
-                lower_allowed_nodes = [el.lower() for el in self.allowed_nodes]
-                nodes = [
-                    node for node in nodes if node.type.lower() in lower_allowed_nodes
-                ]
-                relationships = [
-                    rel
-                    for rel in relationships
-                    if rel.source.type.lower() in lower_allowed_nodes
-                    and rel.target.type.lower() in lower_allowed_nodes
-                ]
-            if self.allowed_relationships:
-                # Filter by type and direction
-                if self._relationship_type == "tuple":
-                    relationships = [
-                        rel
-                        for rel in relationships
-                        if (
-                            (
-                                rel.source.type.lower(),
-                                rel.type.lower(),
-                                rel.target.type.lower(),
-                            )
-                            in [  # type: ignore
-                                (s_t.lower(), r_t.lower(), t_t.lower())
-                                for s_t, r_t, t_t in self.allowed_relationships
-                            ]
-                        )
-                    ]
-                else:  # Filter by type only
-                    relationships = [
-                        rel
-                        for rel in relationships
-                        if rel.type.lower()
-                        in [el.lower() for el in self.allowed_relationships]  # type: ignore
-                    ]
-
-        return GraphDocument(nodes=nodes, relationships=relationships, source=document)
+            parsed_json = self._parse_raw_schema(raw_schema)
+            nodes, relationships = self._parse_relations(parsed_json)
+        
+        nodes, relationships = self._apply_strict_mode_filtering(nodes, relationships)
+        return GraphDocument(
+            nodes=nodes,
+            relationships=relationships,
+            source=document
+        )
 
     async def aconvert_to_graph_documents(
         self, documents: Sequence[Document], config: Optional[RunnableConfig] = None
