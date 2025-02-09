@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, create_model
 
 DEFAULT_NODE_TYPE = "Node"
 
-examples_advanced  = [
+examples_advanced = [
     {
         "text": "Adam (age 35) works at Microsoft since 2009",
         "head": "Adam",
@@ -317,6 +317,7 @@ class UnstructuredRelationAdvanced(BaseModel):
         description="Properties of the relationship itself",
     )
 
+
 class UnstructuredRelation(BaseModel):
     head: str = Field(
         description=(
@@ -337,6 +338,7 @@ class UnstructuredRelation(BaseModel):
     tail_type: str = Field(
         description="type of the extracted tail entity like Person, Company, etc"
     )
+
 
 def create_unstructured_prompt(
     node_labels: Optional[List[str]] = None,
@@ -452,7 +454,7 @@ def create_unstructured_prompt(
         "crucial.",
         "IMPORTANT NOTES:\n- Don't add any explanation and text. ",
         additional_instructions,
-    ]    
+    ]
     human_string_parts_advanced = [
         "Based on the following example, extract entities, relationships, "
         "entity properties, and relation properties from the provided text.",
